@@ -54,7 +54,7 @@ export class MasterReleaser {
             owner: this.owner,
             repo: this.repo,
             release_id: release.data.id,
-            name: 'master-manifest.json',
+            name: 'manifest.json',
             data: manifestContent
         });
         console.log('[releaser] Published master manifest');

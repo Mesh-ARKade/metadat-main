@@ -16,17 +16,22 @@ export class ManifestAggregator {
         let totalArtifacts = 0;
         let totalSize = 0;
         // Collect all sources from all manifests
+        const allSystems = new Set();
         for (const manifest of manifests) {
             for (const source of manifest.sources) {
                 // Add artifacts to totals
                 for (const artifact of source.artifacts) {
                     totalArtifacts++;
                     totalSize += artifact.size;
-                    totalSystems += artifact.systems.length;
+                    // Track unique system IDs
+                    for (const system of artifact.systems) {
+                        allSystems.add(system.id);
+                    }
                 }
                 allSources.push(source);
             }
         }
+        totalSystems = allSystems.size;
         const master = {
             version: '1.0.0',
             generated: new Date().toISOString(),
