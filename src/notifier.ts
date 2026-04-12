@@ -21,7 +21,11 @@ export class DiscordNotifier {
    * Send notification to Discord
    */
   async notify(event: any, options: NotificationOptions = {}): Promise<void> {
-    if (!this.webhookUrl) return;
+    console.log(`[notifier] Sending ${event.type} notification...`);
+    if (!this.webhookUrl) {
+      console.log('[notifier] No webhook URL configured, skipping notification');
+      return;
+    }
 
     const embed: any = {
       title: this.getEventTitle(event.type, event.source),
@@ -98,9 +102,14 @@ export class DiscordNotifier {
       });
 
       if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`[notifier] Discord webhook failed: ${response.status} - ${errorText}`);
         throw new Error(`Discord webhook failed: ${response.status}`);
       }
+      
+      console.log('[notifier] Notification sent successfully');
     } catch (err) {
+      console.error(`[notifier] Notification error (attempt ${attempt}):`, err);
       if (attempt < this.maxRetries) {
         await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
         return this.sendWithRetry(payload, attempt + 1);
