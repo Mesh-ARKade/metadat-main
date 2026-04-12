@@ -1,8 +1,8 @@
 /**
  * metadat-main - Master Manifest Aggregator (Index Model)
  *
- * @intent Coordinate fetching, validating, and indexing source manifests
- * @guarantee Only healthy manifests are included in the Master Index
+ * @intent Coordinate discovery and release of the Master Index
+ * @guarantee Aggregates URLs from all metadat repos without content manipulation
  */
 /**
  * Run the aggregation pipeline

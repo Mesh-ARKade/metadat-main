@@ -1,8 +1,8 @@
 /**
  * metadat-main - Master Manifest Aggregator (Index Model)
  *
- * @intent Coordinate fetching, validating, and indexing source manifests
- * @guarantee Only healthy manifests are included in the Master Index
+ * @intent Coordinate discovery and release of the Master Index
+ * @guarantee Aggregates URLs from all metadat repos without content manipulation
  */
 import { ManifestFetcher } from './fetcher.js';
 import { ManifestAggregator } from './aggregator.js';
@@ -29,25 +29,19 @@ export async function runAggregator() {
         }).catch(console.error);
     }
     try {
-        // Step 1: Fetch manifests and their metadata
-        console.log('[aggregator] Fetching manifests...');
+        // Step 1: Locate manifests from all sources
+        console.log('[aggregator] Locating manifests...');
         const fetcher = new ManifestFetcher(token);
-        const manifests = await fetcher.fetchLatestManifests(SOURCES);
-        console.log(`[aggregator] Fetched ${manifests.length} manifests`);
-        // Step 2: Run Bouncer and build the Master Index
-        console.log('[aggregator] Validating and Indexing...');
+        const releases = await fetcher.locateLatestManifests(SOURCES);
+        console.log(`[aggregator] Located ${releases.length} manifests`);
+        if (releases.length === 0) {
+            throw new Error('No manifests located - cannot create master index');
+        }
+        // Step 2: Build the Master Index
+        console.log('[aggregator] Building Index...');
         const aggregator = new ManifestAggregator();
-        const result = aggregator.stitch(manifests);
-        const index = result.index;
-        console.log(`[aggregator] Index built: ${index.totalSources} healthy sources identified`);
-        // Check for dropped sources (Bouncer warnings)
-        const warnings = result.droppedSources.map(ds => `Dropped ${ds.name}: ${ds.error}`);
-        if (warnings.length > 0) {
-            console.warn(`[aggregator] Bouncer dropped ${warnings.length} source(s):`, warnings);
-        }
-        if (index.totalSources === 0 && !dryRun) {
-            throw new Error('No healthy manifests found - aborting master release to protect clients');
-        }
+        const index = aggregator.stitch(releases);
+        console.log(`[aggregator] Index built: ${index.totalSources} sources indexed`);
         // Step 3: Publish the Master Index to GitHub
         if (dryRun) {
             console.log('[aggregator] Dry run - skipping release');
@@ -73,10 +67,9 @@ export async function runAggregator() {
                     timestamp: new Date().toISOString(),
                     stats: {
                         sources: index.totalSources,
-                        totalSize: 0, // Not applicable for index
                         releaseUrl
                     }
-                }, { warnings }).catch(console.error);
+                }).catch(console.error);
             }
         }
         console.log('[aggregator] Complete');
