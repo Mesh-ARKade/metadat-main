@@ -44,11 +44,13 @@ export class DiscordNotifier {
       const stats = [
         { metric: 'Healthy Sources', value: event.stats.sources?.toString() || '0' }
       ];
-      embed.description = `**Master Index Updated**\n${this.formatStatsTable(stats)}`;
       
       if (event.stats.releaseUrl) {
         embed.url = event.stats.releaseUrl;
+        stats.push({ metric: 'Release', value: event.stats.releaseUrl });
       }
+      
+      embed.description = `**Master Index Updated**\n${this.formatStatsTable(stats)}`;
     }
 
     // Add warnings if present
