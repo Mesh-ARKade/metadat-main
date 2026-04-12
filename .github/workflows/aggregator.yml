@@ -1,6 +1,6 @@
 # Master Manifest Aggregator Workflow
 #
-# @intent Run aggregation hourly or on repository dispatch
+# @intent Run aggregation twice daily on schedule
 # @guarantee Fetches all metadat repos, stitches master manifest, publishes to latest release
 
 name: Aggregator
@@ -12,9 +12,6 @@ on:
     - cron: '0 23 * * *'
   # Manual trigger
   workflow_dispatch:
-  # Trigger from other repositories
-  repository_dispatch:
-    types: [source-released]
 
 concurrency:
   group: manifest-aggregator
