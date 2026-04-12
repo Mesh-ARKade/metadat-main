@@ -46,19 +46,15 @@ jobs:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
         run: node dist/index.js
         
-      - name: Report status
-        if: always()
+      # === NOTIFY RESULT (node) ===
+      - name: Notify success
+        if: success()
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
-          STATUS: ${{ job.status }}
-        run: |
-          if [ "$STATUS" = "success" ]; then
-            echo "✅ Aggregator completed successfully"
-          else
-            echo "❌ Aggregator failed"
-            if [ -n "$DISCORD_WEBHOOK_URL" ]; then
-              curl -X POST "$DISCORD_WEBHOOK_URL" \
-                -H "Content-Type: application/json" \
-                -d '{"embeds":[{"title":"🔴 Aggregator Failed","color":16711680,"timestamp":"'"$(date -Iseconds)"'"}]}'
-            fi
-          fi
+        run: node dist/index.js --notify-success || true
+
+      - name: Notify failure
+        if: failure()
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: node dist/index.js --notify-failure || true

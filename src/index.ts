@@ -20,6 +20,20 @@ export async function runAggregator(): Promise<void> {
   const token = process.env.GITHUB_TOKEN || process.env.GH_TOKEN || '';
   const webhookUrl = process.env.DISCORD_WEBHOOK_URL || '';
   const dryRun = process.argv.includes('--dry-run');
+  const notifySuccess = process.argv.includes('--notify-success');
+  const notifyFailure = process.argv.includes('--notify-failure');
+
+  // Handle explicit notification-only calls from workflow
+  if (notifySuccess || notifyFailure) {
+    if (!webhookUrl) process.exit(0);
+    const notifier = new DiscordNotifier(webhookUrl);
+    await notifier.notify({
+      type: notifySuccess ? 'success' : 'failure',
+      source: 'aggregator',
+      timestamp: new Date().toISOString()
+    }).catch(console.error);
+    process.exit(0);
+  }
 
   console.log('[aggregator] Starting master index aggregation...');
   console.log(`[aggregator] Sources: ${SOURCES.join(', ')}`);
