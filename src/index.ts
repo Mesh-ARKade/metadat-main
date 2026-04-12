@@ -84,6 +84,7 @@ export async function runAggregator(): Promise<void> {
           timestamp: new Date().toISOString(),
           stats: {
             sources: index.totalSources,
+            sourceNames: index.sources.map(s => s.name),
             releaseUrl
           }
         }).catch(console.error);

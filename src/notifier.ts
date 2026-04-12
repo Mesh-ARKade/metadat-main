@@ -45,6 +45,11 @@ export class DiscordNotifier {
         { metric: 'Healthy Sources', value: event.stats.sources?.toString() || '0' }
       ];
       
+      if (event.stats.sourceNames && event.stats.sourceNames.length > 0) {
+        const names = event.stats.sourceNames.join(', ');
+        stats.push({ metric: 'Sources', value: names });
+      }
+      
       if (event.stats.releaseUrl) {
         embed.url = event.stats.releaseUrl;
         stats.push({ metric: 'Release', value: event.stats.releaseUrl });
