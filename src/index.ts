@@ -38,15 +38,7 @@ export async function runAggregator(): Promise<void> {
   console.log('[aggregator] Starting master index aggregation...');
   console.log(`[aggregator] Sources: ${SOURCES.join(', ')}`);
 
-  // Send started notification
-  if (webhookUrl) {
-    const notifier = new DiscordNotifier(webhookUrl);
-    await notifier.notify({
-      type: 'started',
-      source: 'aggregator',
-      timestamp: new Date().toISOString()
-    }).catch(console.error);
-  }
+  // Note: No "started" notification - only send final result with stats
 
   try {
     // Step 1: Locate manifests from all sources
