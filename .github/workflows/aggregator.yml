@@ -13,7 +13,11 @@ on:
   workflow_dispatch:
   # Trigger from other repositories
   repository_dispatch:
-    types: [update]
+    types: [source-released]
+
+concurrency:
+  group: manifest-aggregator
+  cancel-in-progress: false
 
 jobs:
   aggregate:
@@ -27,7 +31,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
           
       - name: Install dependencies
@@ -38,8 +42,7 @@ jobs:
         
       - name: Run aggregator
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
         run: node dist/index.js
         
