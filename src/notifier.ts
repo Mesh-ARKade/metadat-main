@@ -2,7 +2,7 @@
  * Discord Notifier
  *
  * @intent Send pipeline notifications to Discord webhook with S8 "Stats for Nerds" format
- * @guarantee Posts rich embed with color-coded status, stats table, and timestamps
+ * @guarantee Posts rich embed with color-coded status, stats table, timestamps, and warnings
  */
 
 import type { PipelineEvent } from './types.js';
@@ -27,12 +27,21 @@ export interface DiscordField {
 }
 
 /**
+ * Notification options including warnings
+ */
+export interface NotificationOptions {
+  /** Warning messages to include (e.g., dropped sources from Bouncer) */
+  warnings?: string[];
+}
+
+/**
  * S8 color palette
  */
 const COLORS = {
   started: 0xffff00,   // 🟡 Yellow
   success: 0x00ff00,   // 🟢 Green  
-  failure: 0xff0000    // 🔴 Red
+  failure: 0xff0000,   // 🔴 Red
+  warning: 0xffa500    // 🟠 Orange
 };
 
 /**
@@ -53,30 +62,45 @@ export class DiscordNotifier {
   /**
    * Send notification to Discord
    * @param event Pipeline event with type and data
+   * @param options Additional options like warnings
    */
-  async notify(event: PipelineEvent): Promise<void> {
+  async notify(event: PipelineEvent, options?: NotificationOptions): Promise<void> {
     if (!this.webhookUrl) {
       console.log('[notifier] No webhook URL configured - skipping');
       return;
     }
 
-    const message = this.buildMessage(event);
+    const message = this.buildMessage(event, options);
     await this.sendWithRetry(message);
   }
 
   /**
    * Build Discord embed message from event
    */
-  private buildMessage(event: PipelineEvent): DiscordMessage {
-    const color = this.getColor(event.type);
+  private buildMessage(event: PipelineEvent, options?: NotificationOptions): DiscordMessage {
+    const color = this.getColor(event.type, options?.warnings);
     const emoji = this.getEmoji(event.type);
     const title = `${emoji} ${event.source} pipeline ${event.type}`;
+    
+    // Add warning prefix to title if there are warnings
+    const finalTitle = options?.warnings?.length 
+      ? `⚠️ ${title} (${options.warnings.length} warning(s))` 
+      : title;
     
     const fields: DiscordField[] = [
       { name: 'Source', value: event.source, inline: true },
       { name: 'Type', value: event.type, inline: true },
       { name: 'Time', value: new Date(event.timestamp).toISOString(), inline: true }
     ];
+
+    // Add warnings field if present
+    if (options?.warnings && options.warnings.length > 0) {
+      fields.push({
+        name: '⚠️ Warnings',
+        value: options.warnings.join('\n'),
+        inline: false
+      });
+    }
 
     // Add stats for success
     if (event.type === 'success' && 'stats' in event) {
@@ -99,7 +123,7 @@ export class DiscordNotifier {
 
     return {
       embeds: [{
-        title,
+        title: finalTitle,
         color,
         fields,
         timestamp: new Date().toISOString(),
@@ -111,7 +135,11 @@ export class DiscordNotifier {
   /**
    * Get color for event type
    */
-  private getColor(type: string): number {
+  private getColor(type: string, warnings?: string[]): number {
+    // If there are warnings, use warning color
+    if (warnings && warnings.length > 0) {
+      return COLORS.warning;
+    }
     return COLORS[type as keyof typeof COLORS] || 0x808080;
   }
 

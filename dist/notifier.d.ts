@@ -2,7 +2,7 @@
  * Discord Notifier
  *
  * @intent Send pipeline notifications to Discord webhook with S8 "Stats for Nerds" format
- * @guarantee Posts rich embed with color-coded status, stats table, and timestamps
+ * @guarantee Posts rich embed with color-coded status, stats table, timestamps, and warnings
  */
 import type { PipelineEvent } from './types.js';
 export interface DiscordMessage {
@@ -24,6 +24,13 @@ export interface DiscordField {
     inline?: boolean;
 }
 /**
+ * Notification options including warnings
+ */
+export interface NotificationOptions {
+    /** Warning messages to include (e.g., dropped sources from Bouncer) */
+    warnings?: string[];
+}
+/**
  * Send notifications to Discord
  */
 export declare class DiscordNotifier {
@@ -37,8 +44,9 @@ export declare class DiscordNotifier {
     /**
      * Send notification to Discord
      * @param event Pipeline event with type and data
+     * @param options Additional options like warnings
      */
-    notify(event: PipelineEvent): Promise<void>;
+    notify(event: PipelineEvent, options?: NotificationOptions): Promise<void>;
     /**
      * Build Discord embed message from event
      */

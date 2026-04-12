@@ -49,8 +49,16 @@ export async function runAggregator(): Promise<void> {
     // Step 2: Aggregate into master manifest
     console.log('[aggregator] Aggregating...');
     const aggregator = new ManifestAggregator();
-    const master = aggregator.stitch(manifests);
+    const result = aggregator.stitch(manifests);
+    const master = result.master;
+    
     console.log(`[aggregator] Master: ${master.totalArtifacts} artifacts, ${master.totalSystems} systems, ${master.totalSize} bytes`);
+    
+    // Check for dropped sources (Bouncer warnings)
+    const warnings = result.droppedSources.map(ds => `Dropped ${ds.name}: ${ds.error}`);
+    if (warnings.length > 0) {
+      console.log(`[aggregator] Bouncer dropped ${warnings.length} source(s):`, warnings);
+    }
 
     // Step 3: Publish to GitHub release
     if (dryRun) {
@@ -83,7 +91,7 @@ export async function runAggregator(): Promise<void> {
             size: master.totalSize,
             releaseUrl
           }
-        }).catch(console.error);
+        }, { warnings }).catch(console.error);
       }
     }
 
