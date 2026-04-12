@@ -1,25 +1,14 @@
 /**
- * Manifest Aggregator (Index Model)
+ * Manifest Aggregator (Strict Index Model)
  *
- * @intent Build a master index of healthy source manifests
- * @guarantee Only includes sources that pass Bouncer validation
+ * @intent Build a master index of source manifest URLs
+ * @guarantee Trust the source repositories for their own output validation
  */
 import { type MasterIndex } from './types.js';
-export interface BouncerResult {
-    index: MasterIndex;
-    droppedSources: Array<{
-        name: string;
-        error: string;
-    }>;
-}
+import { type SourceReleaseInfo } from './fetcher.js';
 export declare class ManifestAggregator {
     /**
-     * Stitch valid source manifests into a master index
+     * Stitch source release info into a master index
      */
-    stitch(manifests: Array<{
-        name: string;
-        manifest: any;
-        url: string;
-        repo: string;
-    }>): BouncerResult;
+    stitch(releases: SourceReleaseInfo[]): MasterIndex;
 }

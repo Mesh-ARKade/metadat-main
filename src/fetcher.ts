@@ -1,46 +1,46 @@
 /**
- * Manifest Fetcher
+ * Manifest Fetcher (Index Model)
  *
- * @intent Fetch manifest.json from metadat source repositories
- * @guarantee Returns parsed manifest objects from each source's latest release
+ * @intent Locate manifest.json URLs from metadat source repositories
+ * @guarantee Returns metadata and URLs for each source's latest release
  */
 
 import { Octokit } from '@octokit/rest';
-import type { SourceManifest } from './types.js';
+
+export interface SourceReleaseInfo {
+  name: string;
+  repo: string;
+  manifestUrl: string;
+  updatedAt: string;
+}
 
 /**
- * Fetch manifests from metadat repositories
+ * Fetch manifest locations from metadat repositories
  */
 export class ManifestFetcher {
   private octokit: Octokit;
   private owner = 'Mesh-ARKade';
 
-  /**
-   * @param token GitHub token for API authentication
-   */
   constructor(token: string) {
     this.octokit = new Octokit({ auth: token });
   }
 
   /**
-   * Fetch latest manifests from specified sources
-   * @param sources Array of source names (e.g., ['nointro', 'tosec'])
-   * @returns Array of parsed manifest objects
+   * Locate latest manifests from specified sources
    */
-  async fetchLatestManifests(sources: string[]): Promise<SourceManifest[]> {
-    const manifests: SourceManifest[] = [];
+  async locateLatestManifests(sources: string[]): Promise<SourceReleaseInfo[]> {
+    const results: SourceReleaseInfo[] = [];
 
     for (const source of sources) {
       try {
         const repo = `metadat-${source}`;
+        console.log(`[fetcher] Checking ${repo}...`);
         
-        // Get latest release
         const releaseResponse = await this.octokit.repos.getLatestRelease({
           owner: this.owner,
           repo
         });
 
-        // Find manifest.json asset
         const assets = releaseResponse.data.assets;
         const manifestAsset = assets.find(a => a.name === 'manifest.json');
         
@@ -49,38 +49,19 @@ export class ManifestFetcher {
           continue;
         }
 
-        // Download manifest content
-        const assetResponse = await this.octokit.repos.getReleaseAsset({
-          owner: this.owner,
-          repo,
-          asset_id: manifestAsset.id
+        results.push({
+          name: source,
+          repo: `Mesh-ARKade/${repo}`,
+          manifestUrl: manifestAsset.browser_download_url,
+          updatedAt: releaseResponse.data.published_at || new Date().toISOString()
         });
-
-        // Parse JSON (browser download URL needs to be fetched differently)
-        // For GitHub API, we need to use the browser_download_url
-        const downloadUrl = manifestAsset.browser_download_url;
-        const manifestContent = await this.fetchContent(downloadUrl);
         
-        const parsed = JSON.parse(manifestContent) as SourceManifest;
-        manifests.push(parsed);
-        
-        console.log(`[fetcher] Fetched manifest from ${source}`);
+        console.log(`[fetcher] Located manifest for ${source}`);
       } catch (error) {
-        console.error(`[fetcher] Failed to fetch ${source}:`, error);
+        console.error(`[fetcher] Failed to locate ${source}:`, (error as Error).message);
       }
     }
 
-    return manifests;
-  }
-
-  /**
-   * Fetch content from a URL
-   */
-  private async fetchContent(url: string): Promise<string> {
-    const response = await fetch(url);
-    if (!response.ok) {
-      throw new Error(`Failed to fetch ${url}: ${response.status}`);
-    }
-    return response.text();
+    return results;
   }
 }
