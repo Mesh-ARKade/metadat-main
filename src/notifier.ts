@@ -5,8 +5,6 @@
  * @guarantee Posts rich embed with color-coded status, stats table, timestamps, and warnings
  */
 
-import type { PipelineEvent } from './types.js';
-
 export interface NotificationOptions {
   warnings?: string[];
 }
