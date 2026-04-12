@@ -1,12 +1,12 @@
 /**
- * Manifest Aggregator
+ * Manifest Aggregator (Index Model)
  *
- * @intent Stitch multiple source manifests into a unified master manifest
- * @guarantee Produces MasterManifest with aggregated totals, drops invalid sources
+ * @intent Build a master index of healthy source manifests
+ * @guarantee Only includes sources that pass Bouncer validation
  */
-import type { SourceManifest, MasterManifest } from './types.js';
+import { type MasterIndex } from './types.js';
 export interface BouncerResult {
-    master: MasterManifest;
+    index: MasterIndex;
     droppedSources: Array<{
         name: string;
         error: string;
@@ -14,9 +14,12 @@ export interface BouncerResult {
 }
 export declare class ManifestAggregator {
     /**
-     * Combine multiple source manifests into a master manifest with Bouncer validation
-     * @param manifests Array of source manifests to stitch
-     * @returns BouncerResult with master manifest and any dropped sources
+     * Stitch valid source manifests into a master index
      */
-    stitch(manifests: SourceManifest[]): BouncerResult;
+    stitch(manifests: Array<{
+        name: string;
+        manifest: any;
+        url: string;
+        repo: string;
+    }>): BouncerResult;
 }

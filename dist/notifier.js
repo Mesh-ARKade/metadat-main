@@ -4,140 +4,95 @@
  * @intent Send pipeline notifications to Discord webhook with S8 "Stats for Nerds" format
  * @guarantee Posts rich embed with color-coded status, stats table, timestamps, and warnings
  */
-/**
- * S8 color palette
- */
-const COLORS = {
-    started: 0xffff00, // 🟡 Yellow
-    success: 0x00ff00, // 🟢 Green  
-    failure: 0xff0000, // 🔴 Red
-    warning: 0xffa500 // 🟠 Orange
-};
-/**
- * Send notifications to Discord
- */
 export class DiscordNotifier {
     webhookUrl;
     maxRetries = 3;
-    retryDelay = 1000;
-    /**
-     * @param webhookUrl Discord webhook URL
-     */
     constructor(webhookUrl) {
         this.webhookUrl = webhookUrl;
     }
     /**
      * Send notification to Discord
-     * @param event Pipeline event with type and data
-     * @param options Additional options like warnings
      */
-    async notify(event, options) {
-        if (!this.webhookUrl) {
-            console.log('[notifier] No webhook URL configured - skipping');
+    async notify(event, options = {}) {
+        if (!this.webhookUrl)
             return;
+        const embed = {
+            title: this.getEventTitle(event.type, event.source),
+            color: this.getEventColor(event.type, options.warnings?.length),
+            timestamp: event.timestamp || new Date().toISOString(),
+            fields: []
+        };
+        // Add source if applicable
+        if (event.source && event.source !== 'aggregator') {
+            embed.fields.push({ name: '📁 Source', value: event.source, inline: true });
         }
-        const message = this.buildMessage(event, options);
-        await this.sendWithRetry(message);
-    }
-    /**
-     * Build Discord embed message from event
-     */
-    buildMessage(event, options) {
-        const color = this.getColor(event.type, options?.warnings);
-        const emoji = this.getEmoji(event.type);
-        const title = `${emoji} ${event.source} pipeline ${event.type}`;
-        // Add warning prefix to title if there are warnings
-        const finalTitle = options?.warnings?.length
-            ? `⚠️ ${title} (${options.warnings.length} warning(s))`
-            : title;
-        const fields = [
-            { name: 'Source', value: event.source, inline: true },
-            { name: 'Type', value: event.type, inline: true },
-            { name: 'Time', value: new Date(event.timestamp).toISOString(), inline: true }
-        ];
-        // Add warnings field if present
-        if (options?.warnings && options.warnings.length > 0) {
-            fields.push({
-                name: '⚠️ Warnings',
+        // Add stats table if successful
+        if (event.type === 'success' && event.stats) {
+            const stats = [
+                { metric: 'Healthy Sources', value: event.stats.sources?.toString() || '0' }
+            ];
+            embed.description = `**Master Index Updated**\n${this.formatStatsTable(stats)}`;
+            if (event.stats.releaseUrl) {
+                embed.url = event.stats.releaseUrl;
+            }
+        }
+        // Add warnings if present
+        if (options.warnings && options.warnings.length > 0) {
+            embed.fields.push({
+                name: `⚠️ Bouncer Dropped Sources (${options.warnings.length})`,
                 value: options.warnings.join('\n'),
                 inline: false
             });
         }
-        // Add stats for success
-        if (event.type === 'success' && 'stats' in event) {
-            const stats = event.stats;
-            fields.push({ name: 'Sources', value: String(stats.sources || 0), inline: true }, { name: 'Artifacts', value: String(stats.artifacts || 0), inline: true }, { name: 'Systems', value: String(stats.systems || 0), inline: true });
-            if (stats.releaseUrl) {
-                fields.push({ name: 'Release', value: stats.releaseUrl, inline: false });
+        // Add error if failed
+        if (event.type === 'failure' && event.error) {
+            embed.description = `**Pipeline Failed**\n\`\`\`\n${event.error}\n\`\`\``;
+        }
+        const payload = { embeds: [embed] };
+        await this.sendWithRetry(payload);
+    }
+    getEventTitle(type, source) {
+        const label = source.charAt(0).toUpperCase() + source.slice(1);
+        switch (type) {
+            case 'started': return `⏳ ${label} Started`;
+            case 'success': return `✅ ${label} Complete`;
+            case 'failure': return `🔴 ${label} Failed`;
+            case 'skipped': return `⏭️ ${label} Skipped`;
+            default: return `${label} Event`;
+        }
+    }
+    getEventColor(type, warningCount) {
+        if (type === 'failure')
+            return 0xFF0000; // Red
+        if (warningCount && warningCount > 0)
+            return 0xFFA500; // Orange (Warning)
+        if (type === 'success')
+            return 0x00FF00; // Green
+        if (type === 'started')
+            return 0xFFFF00; // Yellow
+        return 0x808080; // Grey
+    }
+    formatStatsTable(stats) {
+        const rows = stats.map(s => `| ${s.metric} | ${s.value} |`).join('\n');
+        return `\n${rows}\n`;
+    }
+    async sendWithRetry(payload, attempt = 1) {
+        try {
+            const response = await fetch(this.webhookUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            if (!response.ok) {
+                throw new Error(`Discord webhook failed: ${response.status}`);
             }
         }
-        // Add error for failure
-        if (event.type === 'failure' && 'error' in event) {
-            fields.push({ name: 'Error', value: String(event.error), inline: false });
-        }
-        return {
-            embeds: [{
-                    title: finalTitle,
-                    color,
-                    fields,
-                    timestamp: new Date().toISOString(),
-                    footer: { text: 'Mesh-ARKade metadat-main' }
-                }]
-        };
-    }
-    /**
-     * Get color for event type
-     */
-    getColor(type, warnings) {
-        // If there are warnings, use warning color
-        if (warnings && warnings.length > 0) {
-            return COLORS.warning;
-        }
-        return COLORS[type] || 0x808080;
-    }
-    /**
-     * Get emoji for event type
-     */
-    getEmoji(type) {
-        const emojis = {
-            started: '🟡',
-            success: '🟢',
-            failure: '🔴'
-        };
-        return emojis[type] || '⚪';
-    }
-    /**
-     * Send message with retry logic
-     */
-    async sendWithRetry(message) {
-        let lastError = null;
-        for (let attempt = 1; attempt <= this.maxRetries; attempt++) {
-            try {
-                const response = await fetch(this.webhookUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(message)
-                });
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}`);
-                }
-                console.log('[notifier] Notification sent');
-                return;
+        catch (err) {
+            if (attempt < this.maxRetries) {
+                await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+                return this.sendWithRetry(payload, attempt + 1);
             }
-            catch (error) {
-                lastError = error;
-                console.warn(`[notifier] Attempt ${attempt} failed:`, error);
-                if (attempt < this.maxRetries) {
-                    await this.sleep(this.retryDelay * attempt);
-                }
-            }
+            throw err;
         }
-        throw lastError || new Error('Failed to send notification');
-    }
-    /**
-     * Sleep for ms milliseconds
-     */
-    sleep(ms) {
-        return new Promise(resolve => setTimeout(resolve, ms));
     }
 }

@@ -1,8 +1,8 @@
 /**
- * metadat-main - Master Manifest Aggregator
+ * metadat-main - Master Manifest Aggregator (Index Model)
  *
- * @intent Coordinate fetching, aggregating, and releasing master manifest
- * @guarantee Pulls from all metadat repos, stitches, and publishes to latest release
+ * @intent Coordinate fetching, validating, and indexing source manifests
+ * @guarantee Only healthy manifests are included in the Master Index
  */
 import { ManifestFetcher } from './fetcher.js';
 import { ManifestAggregator } from './aggregator.js';
@@ -17,7 +17,7 @@ export async function runAggregator() {
     const token = process.env.GITHUB_TOKEN || process.env.GH_TOKEN || '';
     const webhookUrl = process.env.DISCORD_WEBHOOK_URL || '';
     const dryRun = process.argv.includes('--dry-run');
-    console.log('[aggregator] Starting master manifest aggregation...');
+    console.log('[aggregator] Starting master index aggregation...');
     console.log(`[aggregator] Sources: ${SOURCES.join(', ')}`);
     // Send started notification
     if (webhookUrl) {
@@ -29,35 +29,35 @@ export async function runAggregator() {
         }).catch(console.error);
     }
     try {
-        // Step 1: Fetch manifests from all sources
+        // Step 1: Fetch manifests and their metadata
         console.log('[aggregator] Fetching manifests...');
         const fetcher = new ManifestFetcher(token);
         const manifests = await fetcher.fetchLatestManifests(SOURCES);
         console.log(`[aggregator] Fetched ${manifests.length} manifests`);
-        if (manifests.length === 0) {
-            throw new Error('No manifests fetched - cannot create master manifest');
-        }
-        // Step 2: Aggregate into master manifest
-        console.log('[aggregator] Aggregating...');
+        // Step 2: Run Bouncer and build the Master Index
+        console.log('[aggregator] Validating and Indexing...');
         const aggregator = new ManifestAggregator();
         const result = aggregator.stitch(manifests);
-        const master = result.master;
-        console.log(`[aggregator] Master: ${master.totalArtifacts} artifacts, ${master.totalSystems} systems, ${master.totalSize} bytes`);
+        const index = result.index;
+        console.log(`[aggregator] Index built: ${index.totalSources} healthy sources identified`);
         // Check for dropped sources (Bouncer warnings)
         const warnings = result.droppedSources.map(ds => `Dropped ${ds.name}: ${ds.error}`);
         if (warnings.length > 0) {
-            console.log(`[aggregator] Bouncer dropped ${warnings.length} source(s):`, warnings);
+            console.warn(`[aggregator] Bouncer dropped ${warnings.length} source(s):`, warnings);
         }
-        // Step 3: Publish to GitHub release
+        if (index.totalSources === 0 && !dryRun) {
+            throw new Error('No healthy manifests found - aborting master release to protect clients');
+        }
+        // Step 3: Publish the Master Index to GitHub
         if (dryRun) {
             console.log('[aggregator] Dry run - skipping release');
-            console.log('[aggregator] Master manifest:');
-            console.log(JSON.stringify(master, null, 2));
+            console.log('[aggregator] Master Index:');
+            console.log(JSON.stringify(index, null, 2));
         }
         else {
-            console.log('[aggregator] Publishing to GitHub...');
+            console.log('[aggregator] Publishing Master Index to GitHub...');
             const releaser = new MasterReleaser(token);
-            const releaseUrl = await releaser.publishLatest(JSON.stringify(master, null, 2));
+            const releaseUrl = await releaser.publishLatest(JSON.stringify(index, null, 2));
             console.log(`[aggregator] Published: ${releaseUrl}`);
             // Export for GitHub Actions
             if (process.env.GITHUB_ENV) {
@@ -72,10 +72,8 @@ export async function runAggregator() {
                     source: 'aggregator',
                     timestamp: new Date().toISOString(),
                     stats: {
-                        sources: manifests.length,
-                        artifacts: master.totalArtifacts,
-                        systems: master.totalSystems,
-                        size: master.totalSize,
+                        sources: index.totalSources,
+                        totalSize: 0, // Not applicable for index
                         releaseUrl
                     }
                 }, { warnings }).catch(console.error);
