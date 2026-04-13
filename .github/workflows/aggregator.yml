@@ -42,4 +42,5 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          AGGREGATOR_RUN_URL: ${{ github.server_url }}/Mesh-ARKade/metadat-main/actions/runs/${{ github.run_id }}
         run: node dist/index.js

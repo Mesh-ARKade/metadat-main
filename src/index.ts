@@ -17,8 +17,10 @@ const SOURCES = ['nointro', 'tosec', 'redump', 'mame'];
  * Run the aggregation pipeline
  */
 export async function runAggregator(): Promise<void> {
+  const startTime = Date.now();
   const token = process.env.GITHUB_TOKEN || process.env.GH_TOKEN || '';
   const webhookUrl = process.env.DISCORD_WEBHOOK_URL || '';
+  const actionUrl = process.env.AGGREGATOR_RUN_URL || '';
   const dryRun = process.argv.includes('--dry-run');
   const notifySuccess = process.argv.includes('--notify-success');
   const notifyFailure = process.argv.includes('--notify-failure');
@@ -78,14 +80,21 @@ export async function runAggregator(): Promise<void> {
       // Send success notification
       if (webhookUrl) {
         const notifier = new DiscordNotifier(webhookUrl);
+        const droppedCount = SOURCES.length - index.totalSources;
+        const duration = Math.round((Date.now() - startTime) / 1000);
         await notifier.notify({
           type: 'success',
           source: 'aggregator',
           timestamp: new Date().toISOString(),
           stats: {
             sources: index.totalSources,
+            sourcesAttempted: SOURCES.length,
+            droppedCount,
             sourceNames: index.sources.map(s => s.name),
-            releaseUrl
+            sourceVersions: index.sources.map(s => ({ name: s.name, lastUpdated: s.lastUpdated })),
+            releaseUrl,
+            actionUrl,
+            duration
           }
         }).catch(console.error);
       }

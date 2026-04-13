@@ -41,21 +41,40 @@ export class DiscordNotifier {
 
     // Add stats table if successful
     if (event.type === 'success' && event.stats) {
+      const s = event.stats;
+
       const stats = [
-        { metric: 'Healthy Sources', value: event.stats.sources?.toString() || '0' }
+        { metric: 'Sources', value: `${s.sources ?? 0} / ${s.sourcesAttempted ?? s.sources ?? 0}` },
       ];
-      
-      if (event.stats.sourceNames && event.stats.sourceNames.length > 0) {
-        const names = event.stats.sourceNames.join(', ');
-        stats.push({ metric: 'Sources', value: names });
+
+      if ((s.droppedCount ?? 0) > 0) {
+        stats.push({ metric: 'Dropped', value: `${s.droppedCount}` });
       }
-      
-      if (event.stats.releaseUrl) {
-        embed.url = event.stats.releaseUrl;
-        stats.push({ metric: 'Release', value: event.stats.releaseUrl });
+
+      if (s.duration) {
+        const m = Math.floor(s.duration / 60);
+        const sec = s.duration % 60;
+        stats.push({ metric: 'Duration', value: `${m}m ${sec}s` });
       }
-      
+
+      if (s.sourceVersions && s.sourceVersions.length > 0) {
+        for (const sv of s.sourceVersions) {
+          stats.push({ metric: sv.name, value: sv.lastUpdated?.split('T')[0] ?? 'unknown' });
+        }
+      }
+
       embed.description = `**Master Index Updated**\n${this.formatStatsTable(stats)}`;
+
+      // Set embed URL so the title is clickable → release
+      if (s.releaseUrl) embed.url = s.releaseUrl;
+
+      // Links field — rendered as markdown hyperlinks in Discord
+      const links: string[] = [];
+      if (s.releaseUrl) links.push(`[View Release](${s.releaseUrl})`);
+      if (s.actionUrl) links.push(`[View Run](${s.actionUrl})`);
+      if (links.length > 0) {
+        embed.fields.push({ name: '🔗 Links', value: links.join('  ·  '), inline: false });
+      }
     }
 
     // Add warnings if present
