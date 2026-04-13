@@ -43,27 +43,30 @@ export class DiscordNotifier {
     if (event.type === 'success' && event.stats) {
       const s = event.stats;
 
+      // Metrics only — these get bars
       const stats = [
         { metric: 'Sources', value: `${s.sources ?? 0} / ${s.sourcesAttempted ?? s.sources ?? 0}` },
       ];
-
       if ((s.droppedCount ?? 0) > 0) {
         stats.push({ metric: 'Dropped', value: `${s.droppedCount}` });
       }
-
       if (s.duration) {
         const m = Math.floor(s.duration / 60);
         const sec = s.duration % 60;
         stats.push({ metric: 'Duration', value: `${m}m ${sec}s` });
       }
 
+      // Source versions — plain text list, no bars
+      let sourcesBlock = '';
       if (s.sourceVersions && s.sourceVersions.length > 0) {
-        for (const sv of s.sourceVersions) {
-          stats.push({ metric: sv.name, value: sv.lastUpdated?.split('T')[0] ?? 'unknown' });
-        }
+        const nameWidth = Math.max(...s.sourceVersions.map((sv: any) => sv.name.length));
+        const lines = s.sourceVersions.map((sv: any) =>
+          `${sv.name.padEnd(nameWidth)}  ${sv.lastUpdated?.split('T')[0] ?? 'unknown'}`
+        );
+        sourcesBlock = '\n```\n' + lines.join('\n') + '\n```\n';
       }
 
-      embed.description = `**Master Index Updated**\n${this.formatStatsTable(stats)}`;
+      embed.description = `**Master Index Updated**\n${this.formatStatsTable(stats)}${sourcesBlock}`;
 
       // Set embed URL so the title is clickable → release
       if (s.releaseUrl) embed.url = s.releaseUrl;
