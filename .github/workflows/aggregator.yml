@@ -7,9 +7,9 @@ name: Aggregator
 
 on:
   schedule:
-    # Run twice daily: 5 AM CST (11:00 UTC) and 5 PM CST (23:00 UTC)
-    - cron: '0 11 * * *'
-    - cron: '0 23 * * *'
+    # Run twice daily: 4 AM CST (10:00 UTC) and 4 PM CST (22:00 UTC)
+    - cron: '0 10 * * *'
+    - cron: '0 22 * * *'
   # Manual trigger
   workflow_dispatch:
 
